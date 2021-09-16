@@ -2,14 +2,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from keras.utils import np_utils
-from sklearn import utils
 from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 from sklearn.model_selection import train_test_split
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.callbacks import EarlyStopping
 from keras.layers import LSTM
-from tensorflow import optimizers
 import tensorflow.compat.v1 as tf
 
 tf.disable_v2_behavior()
@@ -17,17 +15,25 @@ tf.disable_v2_behavior()
 np.random.seed(0)
 tf.set_random_seed(0)
 
-df = pd.read_csv('aoa_dataset.csv', engine='python')
-df.columns = ['aoa', 'rssi0', 'rssi1', 'pa0', 'pa1', 'angle']
-df = df.drop(['aoa', 'rssi0', 'rssi1'], axis=1)
-print(df.head())
-print(len(df))
+train = pd.read_csv('aoa_train.csv', engine='python')
+val = pd.read_csv('aoa_val.csv', engine='python')
+test = pd.read_csv('aoa_test.csv', engine='python')
+train.columns = ['index', 'pa0', 'pa1', 'angle']
+train = train.drop(['index'], axis=1)
+val.columns = ['index', 'pa0', 'pa1', 'angle']
+val = val.drop(['index'], axis=1)
+test.columns = ['index', 'pa0', 'pa1', 'angle']
+test = test.drop(['index'], axis=1)
+print(train.head())
+print(len(train), len(val), len(test))
 
 # one-hot encoding
-for i in range(len(df)):
-    df['angle'][i] += 90
-    df['angle'][i] //= 10
-# print(df.head())
+for d in (train, val, test):
+    for i in range(len(d)):
+        d['angle'][i] += 90
+        d['angle'][i] //= 10
+    print(d.head())
+
 
 def make_dataset(data, label, window_size=20):
     feature_list = []
@@ -40,19 +46,10 @@ def make_dataset(data, label, window_size=20):
 
 feature_cols = ['pa0', 'pa1']
 label_cols = ['angle']
-df_x, df_y = np.empty((0, 20, 2)), np.empty((0, 1))
+# train_x, train_y = np.empty((0, 20, 2)), np.empty((0, 1))
 
-for i in range(13):
-    d1 = df[df['angle']==i]
-    # print(d1)
 
-    # plt.figure()
-    # plt.title(i)
-    # plt.plot(d1['a1'][:], label='a1')
-    # plt.plot(d1['a2'][:], label='a2')
-    # plt.legend()
-    # plt.show()
-
+def data(d1):
     # feature/label split
     d1_feature = d1[feature_cols]
     d1_label = d1[label_cols]
@@ -65,16 +62,12 @@ for i in range(13):
 
     # train dataset 생성
     d1_x, d1_y = make_dataset(d1_feature, d1_label)
-    print(i, ":", len(d1), len(d1_x))
-    df_x = np.concatenate([df_x, d1_x])
-    df_y = np.concatenate([df_y, d1_y])
+    return d1_x, d1_y
 
-# print(df_x)
-# print(df_y)
 
-# train, validation set
-x_train, x_valid, y_train, y_valid = train_test_split(df_x, df_y, test_size=0.2)
-x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=0.2)
+x_train, y_train = data(train)
+x_valid, y_valid = data(val)
+x_test, y_test = data(test)
 
 # one-hot encoding
 y_train = np_utils.to_categorical(y_train, num_classes=19)
@@ -82,15 +75,15 @@ y_valid = np_utils.to_categorical(y_valid, num_classes=19)
 y_test = np_utils.to_categorical(y_test, num_classes=19)
 
 print(x_train.shape, y_train.shape)
-# (8152, 20, 2) (8152, 13)
+# (303992, 20, 2) (303992, 19)
 print(x_valid.shape, y_valid.shape)
-# (2548, 20, 2) (2548, 13)
+# (37998, 20, 2) (37998, 19)
 print(x_test.shape, y_test.shape)
-# (2039, 20, 2) (2039, 13)
+# (37998, 20, 2) (37998, 19)
 
 model = Sequential()
 model.add(LSTM(16,
-               input_shape=(df_x.shape[1], df_x.shape[2]),
+               input_shape=(x_train.shape[1], x_train.shape[2]),
                activation='tanh',
                return_sequences=False))
 model.add(Dense(19, activation='softmax'))
