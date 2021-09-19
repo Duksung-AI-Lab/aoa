@@ -1,21 +1,87 @@
-import time
 import threading
 import tkinter as tk
 from tkinter import ttk
+from PIL import Image, ImageTk, ImageDraw, ImageFont
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MaxAbsScaler
+from sklearn.preprocessing import RobustScaler
+import collections
+import time
+import numpy as np
+import pandas as pd
 
-from PIL import Image, ImageTk, ImageDraw
+from serial import Serial
+from tensorflow.keras.models import load_model
 
-SIZE = (500, 600)
+model1 = load_model('./model/210916_rnn_reg.h5')
+#model2 = load_model('./model/LSTM_class2.h5')
+
+# ser = Serial('COM9', 9600)  # 윈도우
+ser = Serial('/dev/ttyACM0', 115200)  # 라즈베리파이
+
+#scaler 
+df_train=pd.read_csv('./dataset/aoa_train.csv', engine='python')
+scaler = RobustScaler()
+df_train.columns = ['dummy', 'pa0', 'pa1', 'angle']
+scaler.fit(df_train[['pa0','pa1']])
+
+angle_scaler = MinMaxScaler()
+angle_scaler.fit(df_train[['angle']])
+
+
+p = collections.deque()
+SIZE = 20
+#label = [i for i in range(-90, 91, 10)]
+
+WIN_SIZE = (500, 600)
 ARC_SIZE = 100
-
-angle = -180
-
+angle = 0
 
 def get_degree():
     global angle
     while True:
-        angle += 10
-        time.sleep(1)
+        if ser.readable():
+            res = ser.readline()
+            s = res.decode()[:len(res) - 1]
+
+            a = s.split(',')
+            try:
+                # parsing
+                pa0 = int(a[3].split()[-1])
+                pa1 = int(a[4].split()[-1])
+                # print(pa0, pa1)
+
+            except IndexError:
+                continue
+
+            if len(p) < SIZE:
+                p.append([pa0, pa1])
+                continue
+            else:
+                p.popleft()
+                p.append([pa0, pa1])
+            # print(p)
+
+            # RobustScale
+            data = scaler.transform(p)
+	    
+            #CNN data shape
+            data = np.reshape(data, (-1, SIZE, 1, 2))
+	    #RNN data shape
+	    #data = np.reshape(data, (1, SIZE, 2))
+
+            # print(data.shape)
+
+            pred1 = model1.predict(data)
+            angle = angle_scaler.inverse_transform(pred1)
+
+            # aoa = int(a[0].split()[-1]) + 45
+            #pred2 = np.argmax(model2.predict(data), axis=-1)
+            #angle = label[pred2[0]]
+
+            print(*angle)
+
+            time.sleep(0.1)
 
 
 class Gauge(ttk.Label):
@@ -57,30 +123,28 @@ class Gauge(ttk.Label):
             self.im = Image.new('RGBA', (1000, 1000))
             draw = ImageDraw.Draw(self.im)
             draw.arc((0, 0, 990, 990), -180, 0, self.troughcolor, ARC_SIZE)
-            draw.arc((0, 0, 990, 990), -180, angle, self.indicatorcolor, ARC_SIZE)
+            draw.arc((0, 0, 990, 990), angle-91, angle-89, self.indicatorcolor, ARC_SIZE)
+
+            font = ImageFont.truetype(font="TlwgTypo-Bold.ttf", size=50)
+            draw.text((450, 500), str(angle), (0, 0, 0), font)
+
             self.arc = ImageTk.PhotoImage(self.im.resize((self.size, self.size), Image.LANCZOS))
             self.configure(image=self.arc)
-            text.set(angle)
-            label.configure()
-            time.sleep(1)
+
+            time.sleep(0.1)
 
 
 if __name__ == '__main__':
     root = tk.Tk()
-    root.geometry(str(SIZE[0]) + 'x' + str(SIZE[1]))
+    root.geometry(str(WIN_SIZE[0]) + 'x' + str(WIN_SIZE[1]))
+    root.title("Angle")
+
     style = ttk.Style()
     gauge = Gauge(root, padding=50)
     gauge.pack()
     # ttk.Scale(root, from_=0, to=180, variable=gauge.arcvariable).pack(fill='x', padx=10, pady=10)
     # update the textvariable with the degrees information when the arcvariable changes
     # gauge.arcvariable.trace_add('write', lambda *args, g=gauge: g.textvariable.set(f'{g.arcvariable.get()} deg'))
-
-    text = tk.StringVar()
-    text.set(angle)
-    label = tk.Label(root,
-                     textvariable=text,
-                     font=("gothic", "20"))
-    label.pack()
 
     t1 = threading.Thread(target=get_degree)
     t1.start()
