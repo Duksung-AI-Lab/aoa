@@ -5,9 +5,9 @@ import pandas as pd
 
 angle = 90
 
-df = pd.read_csv('aoa/aoa_dataset.csv', engine='python')    ### 경로 설정
+df = pd.read_csv('../aoa_dataset.csv', engine='python')    ### 경로 설정
 df.columns = ['aoa', 'rssi0', 'rssi1', 'pa0', 'pa1', 'angle']
-df = df.drop(['aoa', 'rssi0', 'rssi1'], axis=1)
+df.drop(['aoa', 'rssi0', 'rssi1'], axis=1)
 
 data = []
 for k in range(-90, 91, 10):
