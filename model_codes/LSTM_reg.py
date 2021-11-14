@@ -1,15 +1,12 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from keras.utils import np_utils
-from sklearn import utils
 from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
 from sklearn.model_selection import train_test_split
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.callbacks import EarlyStopping
 from keras.layers import LSTM
-from tensorflow import optimizers
 import tensorflow.compat.v1 as tf
 
 tf.disable_v2_behavior()
@@ -17,7 +14,7 @@ tf.disable_v2_behavior()
 np.random.seed(0)
 tf.set_random_seed(0)
 
-df = pd.read_csv('aoa_dataset.csv', engine='python')
+df = pd.read_csv('../dataset/aoa_dataset.csv', engine='python')
 df.columns = ['aoa', 'rssi0', 'rssi1', 'pa0', 'pa1', 'angle']
 df = df.drop(['aoa', 'rssi0', 'rssi1'], axis=1)
 print(df.head())
@@ -57,6 +54,7 @@ df_x, df_y = np.empty((0, 20, 2)), np.empty((0, 1))
 for i in range(-90, 91, 10):
     # print(d1)
 
+    '''visualize'''
     # plt.figure()
     # plt.title(i)
     # plt.plot(d1['a1'][:], label='a1')
@@ -96,6 +94,8 @@ model.add(Dense(1))
 model.compile(loss='mse', optimizer='adam')
 early_stop = EarlyStopping(monitor='val_loss', patience=5)
 
+print(model.summary())
+
 history = model.fit(x_train, y_train,
                     epochs=50,
                     validation_data=(x_valid, y_valid),
@@ -106,12 +106,23 @@ print("\n Test Loss: %.4f" % (model.evaluate(x_test, y_test)))
 
 y_pred = model.predict(x_test)
 
-# # inverse scale
-# y_pred = scaler.inverse_transform(y_pred)
-# y_test = scaler.inverse_transform(y_test)
+y_vloss = history.history['val_loss']
+y_loss = history.history['loss']
+
+x_len = np.arange(len(y_loss))
+plt.plot(x_len, y_loss, marker='.', c="red", label='loss')
+plt.plot(x_len, y_vloss, marker='.', c="blue", label='val_loss')
+
+plt.legend(loc='upper right')
+plt.grid()
+plt.xlabel('epoch')
+plt.ylabel('loss')
+plt.show()
 
 plt.figure()
 plt.plot(y_test, label='actual')
 plt.plot(y_pred, label='prediction')
 plt.legend()
 plt.show()
+
+# model.save('model/LSTM_reg.h5')

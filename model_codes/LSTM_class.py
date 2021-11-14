@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from keras.utils import np_utils
 from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler
-from sklearn.model_selection import train_test_split
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.callbacks import EarlyStopping
@@ -117,5 +116,7 @@ plt.plot(x_len, val_acc, marker='.', c="blue", label='Test_acc')
 plt.legend(loc='upper right')
 plt.grid()
 plt.xlabel('epoch')
-plt.ylabel('loss/acc')
+plt.ylabel('acc')
 plt.show()
+
+# model.save('model/LSTM_class.h5')
