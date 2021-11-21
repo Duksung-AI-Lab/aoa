@@ -1,3 +1,4 @@
+import joblib
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -7,26 +8,32 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.callbacks import EarlyStopping
 from keras.layers import LSTM
-import tensorflow.compat.v1 as tf
 
-tf.disable_v2_behavior()
+# import tensorflow.compat.v1 as tf
+# tf.disable_v2_behavior()
+import tensorflow as tf
+#
+# np.random.seed(0)
+# tf.set_random_seed(0)
+tf.random.set_seed(0)
 
-np.random.seed(0)
-tf.set_random_seed(0)
+train = pd.read_csv('../dataset/data_split/aoa_train.csv', engine='python')
+val = pd.read_csv('../dataset/data_split/aoa_val.csv', engine='python')
+test = pd.read_csv('../dataset/data_split/aoa_test.csv', engine='python')
 
-train = pd.read_csv('aoa_train.csv', engine='python')
-val = pd.read_csv('aoa_val.csv', engine='python')
-test = pd.read_csv('aoa_test.csv', engine='python')
 train.columns = ['index', 'pa0', 'pa1', 'angle']
 train = train.drop(['index'], axis=1)
+
 val.columns = ['index', 'pa0', 'pa1', 'angle']
 val = val.drop(['index'], axis=1)
+
 test.columns = ['index', 'pa0', 'pa1', 'angle']
 test = test.drop(['index'], axis=1)
-print(train.head())
-print(len(train), len(val), len(test))
 
-# one-hot encoding
+# print(train.head())
+print(train.shape, val.shape, test.shape)
+
+'''0~18 scaling for one-hot encoding'''
 for d in (train, val, test):
     for i in range(len(d)):
         d['angle'][i] += 90
@@ -45,30 +52,45 @@ def make_dataset(data, label, window_size=20):
 
 feature_cols = ['pa0', 'pa1']
 label_cols = ['angle']
-# train_x, train_y = np.empty((0, 20, 2)), np.empty((0, 1))
 
+'''feature/label split'''
+train_feature = train[feature_cols]
+train_label = train[label_cols]
 
-def data(d1):
-    # feature/label split
-    d1_feature = d1[feature_cols]
-    d1_label = d1[label_cols]
+val_feature = val[feature_cols]
+val_label = val[label_cols]
 
-    # MinMaxScale (0~1)
-    scaler = MinMaxScaler()
-    d1_feature = scaler.fit_transform(d1_feature)
-    d1_feature = pd.DataFrame(d1_feature)
-    d1_feature.columns = feature_cols
+test_feature = test[feature_cols]
+test_label = test[label_cols]
 
-    # train dataset 생성
-    d1_x, d1_y = make_dataset(d1_feature, d1_label)
-    return d1_x, d1_y
+'''scaling'''
+scaler = MaxAbsScaler()
+scaler.fit(train_feature)
 
+train_feature = scaler.transform(train_feature)
+val_feature = scaler.transform(val_feature)
+test_feature = scaler.transform(test_feature)
 
-x_train, y_train = data(train)
-x_valid, y_valid = data(val)
-x_test, y_test = data(test)
+# 객체를 pickled binary file 형태로 저장한다
+file_name = '../model/aoa_cls_mas.pkl'
+joblib.dump(scaler, file_name)
 
-# one-hot encoding
+# make dataset 함수에 넣기 위해 data frame 형식으로 변환
+train_feature = pd.DataFrame(train_feature)
+train_feature.columns = feature_cols
+
+val_feature = pd.DataFrame(val_feature)
+val_feature.columns = feature_cols
+
+test_feature = pd.DataFrame(test_feature)
+test_feature.columns = feature_cols
+
+'''make dataset'''
+x_train, y_train = make_dataset(train_feature, train_label)
+x_valid, y_valid = make_dataset(val_feature, val_label)
+x_test, y_test = make_dataset(test_feature, test_label)
+
+'''one-hot encoding'''
 y_train = np_utils.to_categorical(y_train, num_classes=19)
 y_valid = np_utils.to_categorical(y_valid, num_classes=19)
 y_test = np_utils.to_categorical(y_test, num_classes=19)
@@ -90,19 +112,17 @@ model.add(Dense(19, activation='softmax'))
 model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['acc'])
 early_stop = EarlyStopping(monitor='val_loss', patience=5)
 
+print(model.summary())
+
 history = model.fit(x_train, y_train,
                     epochs=20,
                     validation_data=(x_valid, y_valid),
                     callbacks=[early_stop],
-                    verbose=1)
+                    verbose=2)
 
 print("\n Test Accuracy: %.4f" % (model.evaluate(x_test, y_test))[1])
 
 y_pred = model.predict(x_test)
-
-# # inverse scale
-# y_pred = scaler.inverse_transform(y_pred)
-# y_test = scaler.inverse_transform(y_test)
 
 acc = history.history['acc']
 val_acc = history.history['val_acc']
@@ -119,4 +139,4 @@ plt.xlabel('epoch')
 plt.ylabel('acc')
 plt.show()
 
-# model.save('model/LSTM_class.h5')
+model.save('../model/LSTM_class.h5')

@@ -2,9 +2,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk, ImageDraw, ImageFont
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import MaxAbsScaler
-from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, RobustScaler
 import collections
 import time
 import numpy as np
@@ -14,28 +12,28 @@ from serial import Serial
 from tensorflow.keras.models import load_model
 
 model1 = load_model('./model/210916_rnn_reg.h5')
-#model2 = load_model('./model/LSTM_class2.h5')
+# model2 = load_model('./model/LSTM_class2.h5')
 
 # ser = Serial('COM9', 9600)  # 윈도우
 ser = Serial('/dev/ttyACM0', 115200)  # 라즈베리파이
 
-#scaler 
-df_train=pd.read_csv('./dataset/aoa_train.csv', engine='python')
+# scaler
+df_train = pd.read_csv('./dataset/aoa_train.csv', engine='python')
 scaler = RobustScaler()
 df_train.columns = ['dummy', 'pa0', 'pa1', 'angle']
-scaler.fit(df_train[['pa0','pa1']])
+scaler.fit(df_train[['pa0', 'pa1']])
 
 angle_scaler = MinMaxScaler()
 angle_scaler.fit(df_train[['angle']])
 
-
 p = collections.deque()
 SIZE = 20
-#label = [i for i in range(-90, 91, 10)]
+# label = [i for i in range(-90, 91, 10)]
 
 WIN_SIZE = (500, 600)
 ARC_SIZE = 100
 angle = 0
+
 
 def get_degree():
     global angle
@@ -64,11 +62,11 @@ def get_degree():
 
             # RobustScale
             data = scaler.transform(p)
-	    
-            #CNN data shape
+
+            # CNN data shape
             data = np.reshape(data, (-1, SIZE, 1, 2))
-	    #RNN data shape
-	    #data = np.reshape(data, (1, SIZE, 2))
+            # RNN data shape
+            # data = np.reshape(data, (1, SIZE, 2))
 
             # print(data.shape)
 
@@ -76,8 +74,8 @@ def get_degree():
             angle = angle_scaler.inverse_transform(pred1)
 
             # aoa = int(a[0].split()[-1]) + 45
-            #pred2 = np.argmax(model2.predict(data), axis=-1)
-            #angle = label[pred2[0]]
+            # pred2 = np.argmax(model2.predict(data), axis=-1)
+            # angle = label[pred2[0]]
 
             print(*angle)
 
@@ -123,7 +121,7 @@ class Gauge(ttk.Label):
             self.im = Image.new('RGBA', (1000, 1000))
             draw = ImageDraw.Draw(self.im)
             draw.arc((0, 0, 990, 990), -180, 0, self.troughcolor, ARC_SIZE)
-            draw.arc((0, 0, 990, 990), angle-91, angle-89, self.indicatorcolor, ARC_SIZE)
+            draw.arc((0, 0, 990, 990), angle - 91, angle - 89, self.indicatorcolor, ARC_SIZE)
 
             font = ImageFont.truetype(font="TlwgTypo-Bold.ttf", size=50)
             draw.text((450, 500), str(angle), (0, 0, 0), font)
