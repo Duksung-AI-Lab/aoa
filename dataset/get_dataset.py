@@ -5,14 +5,14 @@ import time
 from serial import Serial
 import pandas as pd
 import time
-import csv
+import csv_edit
 print("측정 각도 입력:", end='')
 label=str(input())
 
 st=time.time()
 ser = Serial('/dev/ttyACM0', 115200) #라즈베리파이
 f=open("/home/hyunji/aoa/dataset_"+label+".csv","w", newline='')
-wr=csv.writer(f)
+wr=csv_edit.writer(f)
 if ser.isOpen()==False:
     ser.open()
 i = 0
